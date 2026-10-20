@@ -1,4 +1,5 @@
 const express = require('express');
+const { rateLimit } = require('express-rate-limit');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 /* go to one folder is ..*/
@@ -10,7 +11,16 @@ res.render('signup');
 
 router.post('/signup', (req, res)=> {
 const {username, email, password} = req.body;
+
+if (password.length < 8){
+    return res.status(400).send('Password must be at least 8 characters long');
+
+}const hasSpecialChar = /[!@#$%^&*au(),.?":{}|<>]/.test(password);
+if (!hasSpecialChar) {
+    return res.status(400).send('Password must include at least one special character');
+}
 const hashedPassword= bcrypt.hashSync(password,10);
+
 
 try{
 const insert =db.prepare('INSERT INTO users (username,email, password) VALUES(?,?,?)');
@@ -25,7 +35,16 @@ router.get('/signin',(req, res)=>{
 res.render('signin');
 });
 
-router.post('/signin', (req, res) => {
+const signinLimiter = rateLimit({
+    // what our time limit is 10 mins and 6000 one min in milliseconds
+    windowMs: 10 * 60* 1000,
+    limit: 5,
+    message: 'You have reached the sign-in attempt limit. Try again in 10 minutes.',
+
+});
+
+router.post('/signin', signinLimiter, (req, res) => {
+    
 const {username, password} = req.body;
 const user = db.prepare('SELECT * FROM users WHERE username=?').get(username);
 

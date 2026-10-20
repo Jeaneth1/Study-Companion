@@ -146,6 +146,25 @@ requests), and maxAge caps sessions at 24 hours from login.
 four flags are applied, and confirming signin/session persistence still 
 works locally where secure correctly evaluates to false.
 
+### Issu 4: No password requirements on signup
+
+**What was found:** The /signup route accepted any password 
+at all, no minimum length, no complexity check, even an empty 
+password would be accepted and hashed successfully.
+
+**Why it mattered:** Weak, short passwords are the easiest 
+target for brute force guessing against the /signin form, and 
+if the database were ever compromised separately, weak 
+password hashes are dramatically faster to crack offline than 
+longer ones, since there are far fewer possible short 
+passwords to test against.
+
+**What changed:** Added server side validation in /signup 
+enforcing a minimum length of 8 characters, a maximum of 64 
+(bcrypt only uses the first 72 bytes of any input, so 
+anything longer provides no additional security and can be 
+misleading), and at least one special character.
+
 ### Known limitations of this revamp
 
 This audit covered three issues found in app.js and auth.js. It did not 
