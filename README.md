@@ -146,7 +146,7 @@ requests), and maxAge caps sessions at 24 hours from login.
 four flags are applied, and confirming signin/session persistence still 
 works locally where secure correctly evaluates to false.
 
-### Issu 4: No password requirements on signup
+### Issue 4: No password requirements on signup
 
 **What was found:** The /signup route accepted any password 
 at all, no minimum length, no complexity check, even an empty 
@@ -160,10 +160,21 @@ longer ones, since there are far fewer possible short
 passwords to test against.
 
 **What changed:** Added server side validation in /signup 
-enforcing a minimum length of 8 characters, a maximum of 64 
-(bcrypt only uses the first 72 bytes of any input, so 
-anything longer provides no additional security and can be 
-misleading), and at least one special character.
+enforcing a minimum length of 8 characters and at least one special character.
+
+### Issue 5: No rate limiting on sign-in attempts
+
+**What was found:** The /signin route accepted unlimited attempts, so nothing slowed down someone guessing a user's password.
+
+**Why it mattered:** Without a limit, an attacker can brute force a password with as many guesses as they want. The password requirements from Issue 4 make guessing harder, but unlimited attempts still give an attacker unlimited chances.
+
+**What changed:** Added the express-rate-limit package in routes/auth.js. I used its rateLimit function to create a signinLimiter that allows 5 attempts per IP address in a 10 minute window, and placed it as middleware on POST /signin so it runs before the sign-in code. The 6th attempt returns HTTP 429 (Too Many Requests) with the message "You have reached the sign-in attempt limit. Try again in 10 minutes." Successful sign-ins also count toward the limit.
+
+**Verified by:** signing in once successfully, then with the wrong password until blocked. The server log shows four 401 responses followed by a 429. The blocked request took about 1 ms, compared to about 80 ms for a normal attempt, because the limiter stopped it before the database lookup and bcrypt check ran.
+
+![Server log showing four 401 responses followed by a 429](images/rate-limit-log.png)
+
+**Found during testing:** The Issue 4 length check was inverted. It rejected passwords between 8 and 64 characters (the valid ones) instead of short ones. Fixed so passwords under 8 characters are now rejected.
 
 ### Known limitations of this revamp
 
